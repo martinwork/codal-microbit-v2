@@ -65,16 +65,19 @@ MicroBitBLEService::~MicroBitBLEService()
 
 void MicroBitBLEService::RegisterBaseUUID( const uint8_t *bytes16UUID)
 {
-    if ( bs_uuid_type)
-        return;
-        
+    MICROBIT_INFO_DMESGN( "MicroBitBLEService::RegisterBaseUUID ", (int) bs_uuid_type);
+  
     ble_uuid128_t uuid128;
     for ( int i = 0; i < 16; i++)
+    {
         uuid128.uuid128[i] = bytes16UUID[ 15 - i];
-    
+        MICROBIT_INFO_DMESGN( " %x", (int) uuid128.uuid128[i]);
+    }
+    MICROBIT_INFO_DMESGN( " ");
+
     MICROBIT_BLE_ECHK( sd_ble_uuid_vs_add( &uuid128, &bs_uuid_type));
     
-    MICROBIT_DEBUG_DMESG( "MicroBitBLEService::RegisterBaseUUID bs_uuid_type = %d", (int) bs_uuid_type);
+    MICROBIT_INFO_DMESG( "bs_uuid_type = %d", (int) bs_uuid_type);
 }
 
 
