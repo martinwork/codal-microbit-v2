@@ -477,7 +477,7 @@ void MicroBitBLEManager::init( ManagedString deviceName, ManagedString serialNum
     cp_init.next_conn_params_update_delay  = APP_TIMER_TICKS(30000);    // 30 seconds
     cp_init.max_conn_params_update_count   = 3;
     cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
-    cp_init.disconnect_on_fail             = true;
+    cp_init.disconnect_on_fail             = false;
     MICROBIT_BLE_ECHK( ble_conn_params_init(&cp_init));
 
     setAdvertiseOnDisconnect( true);
@@ -1032,7 +1032,8 @@ uint8_t MicroBitBLEManager::getCurrentMode()
 bool MicroBitBLEManager::prepareForShutdown()
 {
     bool shutdownOK = true;
-        
+
+    ble_conn_params_stop();
     sd_ble_gap_adv_stop( m_adv_handle);
     setAdvertiseOnDisconnect( false);
 
@@ -1451,6 +1452,7 @@ static bool microbit_ble_sdh_req_handler(nrf_sdh_req_evt_t req, void * /*p_conte
             }
             else
             {
+                ble_conn_params_stop();
                 sd_ble_gap_adv_stop( m_adv_handle);
                 if ( ble_conn_state_conn_count()) // TODO: anything else we need to wait for?
                 {
