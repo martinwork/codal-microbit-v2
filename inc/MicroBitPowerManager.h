@@ -259,7 +259,7 @@ class MicroBitPowerManager : public CodalComponent
          * note: ALL peripherals will be shutdown in this period. If you wish to keep peripherals active,
          * simply use uBit.sleep();
          */
-        void deepSleep(uint32_t milliSeconds);
+        void deepSleep(uint32_t milliSeconds, NRFLowLevelTimer &sysTimer);
 
         /**
          * Powers down the CPU nd USB interface and instructs peripherals to enter an inoperative low power state. However, all

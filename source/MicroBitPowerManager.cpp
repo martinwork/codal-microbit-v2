@@ -355,9 +355,75 @@ void MicroBitPowerManager::idleCallback()
  * note: ALL peripherals will be shutdown in this period. If you wish to keep peripherals active,
  * simply use uBit.sleep();
  */
-void MicroBitPowerManager::deepSleep(uint32_t milliSeconds)
+void MicroBitPowerManager::deepSleep(uint32_t milliSeconds, NRFLowLevelTimer &sysTimer)
 {
-    // TODO
+    // Configure for sleep mode
+    setSleepMode(true);
+
+    // Create a timer interrupt
+    NRF_TIMER_Type *timer       = sysTimer.timer;
+    IRQn_Type       irqn        = TIMER1_IRQn;
+    int             channel     = 2;      //System timer uses period = 0, event = 1 and capture = 3
+    uint32_t        mask        = TIMER_INTENSET_COMPARE2_Msk;
+    uint32_t        ticksPerMS  = 1000;
+    uint32_t        ticksMax    = 60000ul; // Timer::sync() casts to uint16_t
+    uint32_t        msMax       = ticksMax / ticksPerMS;
+
+    uint32_t saveCompare  = timer->CC[channel];
+    uint32_t saveIntenset = timer->INTENSET;
+
+    timer->INTENCLR = timer->INTENSET;
+
+    void (*sysTimerIRQ) (uint16_t channel_bitmsk) = sysTimer.timer_pointer;
+    sysTimer.setIRQ(NULL);
+
+    NVIC_ClearPendingIRQ(irqn);
+    NVIC_EnableIRQ( irqn);
+
+    // Enable wakeup from the the KL27 interrupt line.
+    io.irq1.setDetect(GPIO_PIN_CNF_SENSE_Low);
+
+    timer->TASKS_CAPTURE[channel] = 1;
+    timer->INTENSET = mask;
+
+    uint32_t cc = timer->CC[channel];
+
+    while ( milliSeconds > 0)
+    {
+        uint32_t ms = milliSeconds <= msMax ? milliSeconds : msMax;
+        milliSeconds -= ms;
+
+        cc += ms * ticksPerMS;
+        timer->CC[channel] = cc;
+
+        // Wait for an interrupt to occur. This will either be the requested transition,
+        // or an asynchronous event from the KL27 interface chip.
+        __WFI();
+
+        system_timer_current_time_us();
+
+        if ( io.irq1.isActive())
+        {
+          target_panic(999);
+          break;
+        }
+    }
+
+    // Disable DETECT events 
+    io.irq1.setDetect(GPIO_PIN_CNF_SENSE_Disabled);
+
+    // Restore timer state
+    NVIC_DisableIRQ(irqn);
+    timer->INTENCLR = timer->INTENSET;
+    sysTimer.setIRQ(sysTimerIRQ);
+    timer->CC[channel] = saveCompare;
+
+    system_timer_rebase_events();
+
+    timer->INTENSET = saveIntenset;
+
+    // Configure for running mode.
+    setSleepMode(false);
 }
 
 /**
