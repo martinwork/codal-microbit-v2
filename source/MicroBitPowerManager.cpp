@@ -346,6 +346,7 @@ void MicroBitPowerManager::idleCallback()
     }
 }
 
+#define deepSleepDEBUG 1  //TODO remove debug code
 
 /**
  * Powers down the CPU and USB interface and instructs peripherals to enter an inoperative low power state. However, all
@@ -357,16 +358,69 @@ void MicroBitPowerManager::idleCallback()
  */
 void MicroBitPowerManager::deepSleep(uint32_t milliSeconds, NRFLowLevelTimer &sysTimer)
 {
+    CODAL_TIMESTAMP timeEntry = system_timer_current_time_us();
+
     // Configure for sleep mode
     setSleepMode(true);
 
+#ifdef deepSleepDEBUG
+    ManagedString dbg;
+    dbg = dbg + "IRQ  ";
+
+    for ( int irq = Reset_IRQn; irq <= SPIM3_IRQn; irq++)
+    {
+      if ( NVIC_GetEnableIRQ( (IRQn_Type) irq))
+      {
+        dbg = dbg + ManagedString( (int) irq);
+        dbg = dbg + " ";
+      }
+    }
+    dbg = dbg + "\n";
+  //These are enabled
+  //POWER_CLOCK_IRQn          =   0,              /*!< 0  POWER_CLOCK                                                            */
+  //UARTE0_UART0_IRQn         =   2,              /*!< 2  UARTE0_UART0                                                           */
+  //GPIOTE_IRQn               =   6,              /*!< 6  GPIOTE                                                                 */
+  //SAADC_IRQn                =   7,              /*!< 7  SAADC                                                                  */
+  //RTC0_IRQn                 =  11,              /*!< 11 RTC0                                                                   */
+  //RTC1_IRQn                 =  17,              /*!< 17 RTC1                                                                   */
+  //SWI2_EGU2_IRQn            =  22,              /*!< 22 SWI2_EGU2                                                              */
+  //SWI5_EGU5_IRQn            =  25,              /*!< 25 SWI5_EGU5                                                              */
+  //MWU_IRQn                  =  32,              /*!< 32 MWU                                                                    */
+#endif
+
+//    bool enabled[ SPIM3_IRQn - POWER_CLOCK_IRQn + 1];
+//    for ( int idx = 0; idx <= SPIM3_IRQn - POWER_CLOCK_IRQn; idx++)
+//    {
+//      IRQn_Type irq = (IRQn_Type) ( POWER_CLOCK_IRQn + idx);
+//      enabled[ idx] = NVIC_GetEnableIRQ( irq);
+//      if ( enabled[ idx])
+//        NVIC_DisableIRQ( irq);
+//    }
+//
+//#ifdef deepSleepDEBUG
+//    dbg = dbg + "IRQ  ";
+//
+//    for ( int irq = Reset_IRQn; irq <= SPIM3_IRQn; irq++)
+//    {
+//      if ( NVIC_GetEnableIRQ( (IRQn_Type) irq))
+//      {
+//        dbg = dbg + ManagedString( (int) irq);
+//        dbg = dbg + " ";
+//      }
+//    }
+//    dbg = dbg + "\n";
+//#endif
+
     // Create a timer interrupt
     NRF_TIMER_Type *timer       = sysTimer.timer;
-    IRQn_Type       irqn        = TIMER1_IRQn;
     int             channel     = 2;      //System timer uses period = 0, event = 1 and capture = 3
-    uint32_t        mask        = TIMER_INTENSET_COMPARE2_Msk;
+
     uint32_t        ticksPerMS  = 1000;
-    uint32_t        ticksMax    = 60000ul; // Timer::sync() casts to uint16_t
+    uint32_t        ticksMax    = 0xFFFFFFFFul - ticksPerMS * 1000; // approx 71min
+#ifdef deepSleepDEBUG
+    ticksMax = 2000000;
+    //ticksMax = 100000000ul;
+#endif
     uint32_t        msMax       = ticksMax / ticksPerMS;
 
     uint32_t saveCompare  = timer->CC[channel];
@@ -377,30 +431,121 @@ void MicroBitPowerManager::deepSleep(uint32_t milliSeconds, NRFLowLevelTimer &sy
     void (*sysTimerIRQ) (uint16_t channel_bitmsk) = sysTimer.timer_pointer;
     sysTimer.setIRQ(NULL);
 
-    NVIC_ClearPendingIRQ(irqn);
-    NVIC_EnableIRQ( irqn);
-
     // Enable wakeup from the the KL27 interrupt line.
     io.irq1.setDetect(GPIO_PIN_CNF_SENSE_Low);
 
-    timer->TASKS_CAPTURE[channel] = 1;
-    timer->INTENSET = mask;
+    CODAL_TIMESTAMP timeStart = system_timer_current_time_us();
 
-    uint32_t cc = timer->CC[channel];
+    uint32_t tickStart = sysTimer.captureCounter();
+    sysTimer.setCompare( channel, tickStart);
+    sysTimer.enableIRQ();
 
-    while ( milliSeconds > 0)
+    uint32_t tick0 = tickStart;
+    uint32_t tick1 = tick0;
+
+#ifdef deepSleepDEBUG
+    dbg = dbg + "tick0  ";
+    dbg = dbg + ManagedString( (int) tick0);
+    dbg = dbg + "\n";
+#endif
+
+    uint32_t sleepMillis = 0;
+    uint32_t sleepTicks = timeStart - timeEntry;
+    while (sleepTicks >= 1000)
     {
-        uint32_t ms = milliSeconds <= msMax ? milliSeconds : msMax;
-        milliSeconds -= ms;
+        sleepMillis++;
+        sleepTicks -= 1000;
+    }
 
-        cc += ms * ticksPerMS;
-        timer->CC[channel] = cc;
+#ifdef deepSleepDEBUG
+    dbg = dbg + "sleepMillis ";
+    dbg = dbg + ManagedString( (int) sleepMillis);
+    dbg = dbg + " sleepTicks ";
+    dbg = dbg + ManagedString( (int) sleepTicks);
+    dbg = dbg + "\n";
+#endif
+
+    while ( sleepMillis < milliSeconds)
+    {
+        uint32_t remain = milliSeconds - sleepMillis;
+        if ( remain > msMax)
+        {
+          remain = msMax * ticksPerMS;
+        }
+        else
+        {
+          remain *= ticksPerMS;
+          remain -= sleepTicks;
+          if ( remain < ticksPerMS)
+            break;
+          remain -= 13;           // __WFI() latency
+        }
+
+#ifdef deepSleepDEBUG
+        if ( dbg.length() < 2000)
+        {
+            dbg = dbg + "remain ";
+            dbg = dbg + ManagedString( (int) remain);
+            dbg = dbg + "\n";
+        }
+#endif
+
+        sysTimer.setCompare( channel, tick0 + remain);
+
+#ifdef deepSleepDEBUG
+        if ( dbg.length() < 2000)
+        {
+            dbg = dbg + "expect ";
+            dbg = dbg + ManagedString( (int) timer->CC[channel]);
+            dbg = dbg + "\n";
+        }
+#endif
 
         // Wait for an interrupt to occur. This will either be the requested transition,
         // or an asynchronous event from the KL27 interface chip.
         __WFI();
 
-        system_timer_current_time_us();
+        sysTimer.disableIRQ();
+        tick1 = sysTimer.captureCounter();
+
+#ifdef deepSleepDEBUG
+        if ( dbg.length() < 2000)
+        {
+            dbg = dbg + "tick1  ";
+            dbg = dbg + ManagedString( (int) tick1);
+            dbg = dbg + "\n";
+        }
+#endif
+
+        uint32_t ticks = tick1 - tick0;
+        tick0 = tick1;
+
+#ifdef deepSleepDEBUG
+        if ( dbg.length() < 2000)
+        {
+            dbg = dbg + "ticks  ";
+            dbg = dbg + ManagedString( (int) ticks);
+            dbg = dbg + "\n";
+        }
+#endif
+
+        sleepTicks += ticks;
+        while (sleepTicks >= 1000)
+        {
+            sleepMillis++;
+            sleepTicks -= 1000;
+        }
+
+#ifdef deepSleepDEBUG
+        if ( dbg.length() < 2000)
+        {
+            dbg = dbg + "sleepMillis ";
+            dbg = dbg + ManagedString( (int) sleepMillis);
+            dbg = dbg + " sleepTicks ";
+            dbg = dbg + ManagedString( (int) sleepTicks);
+            dbg = dbg + "\n";
+        }
+#endif
 
         if ( io.irq1.isActive())
         {
@@ -409,21 +554,40 @@ void MicroBitPowerManager::deepSleep(uint32_t milliSeconds, NRFLowLevelTimer &sy
         }
     }
 
+#ifdef deepSleepDEBUG
+    dbg = dbg + "sleepMillis ";
+    dbg = dbg + ManagedString( (int) sleepMillis);
+    dbg = dbg + " sleepTicks ";
+    dbg = dbg + ManagedString( (int) sleepTicks);
+    dbg = dbg + "\n";
+#endif
+
     // Disable DETECT events 
     io.irq1.setDetect(GPIO_PIN_CNF_SENSE_Disabled);
 
     // Restore timer state
-    NVIC_DisableIRQ(irqn);
+    sysTimer.disableIRQ();
     timer->INTENCLR = timer->INTENSET;
     sysTimer.setIRQ(sysTimerIRQ);
     timer->CC[channel] = saveCompare;
 
-    system_timer_rebase_events();
+    system_timer_deepsleep_wakeup( tickStart, tick1, sleepMillis, sleepTicks);
 
     timer->INTENSET = saveIntenset;
 
+    //for ( int idx = 0; idx <= SPIM3_IRQn - POWER_CLOCK_IRQn; idx++)
+    //{
+    //  IRQn_Type irq = (IRQn_Type) ( POWER_CLOCK_IRQn + idx);
+    //  if ( enabled[ idx])
+    //    NVIC_EnableIRQ( irq);
+    //}
+
     // Configure for running mode.
     setSleepMode(false);
+
+#ifdef deepSleepDEBUG
+    DMESGF( dbg.toCharArray());
+#endif
 }
 
 /**
