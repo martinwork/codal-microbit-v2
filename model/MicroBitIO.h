@@ -431,6 +431,20 @@ namespace codal
              * Puts the component in (or out of) sleep (low power) mode.
              */
             virtual int setSleep(bool doSleep) override;
+
+            typedef enum wakeUpReason
+            {
+                wakeUpEnable,    //Prepare wake-up sources when entering deep sleep.
+                wakeUpDisable,   //Disable wake-up sources before leaving deep sleep.
+                wakeUpCount,     //Count all deep sleep wake-up sources. Return the count.
+                wakeUpClear      //Clear all deep sleep wake up sources
+            } wakeUpReason;
+
+            /**
+             * Perform functions related to deep sleep wake-up.
+             * Intended only to called from MicroBitPowerManager
+             */
+            int manageWakeUp( wakeUpReason reason);
     };
 }
 

@@ -127,6 +127,8 @@ MicroBitIO::MicroBitIO(NRF52ADC &a, TouchSensor &s) :
  */
 int MicroBitIO::setSleep(bool doSleep)
 {
+    static bool wasEnabled;
+
     int name;
 
     if (doSleep)
@@ -158,11 +160,18 @@ int MicroBitIO::setSleep(bool doSleep)
 #endif
 
         }
+
+        wasEnabled = NVIC_GetEnableIRQ(GPIOTE_IRQn);
+        if ( wasEnabled)
+          NVIC_DisableIRQ(GPIOTE_IRQn);
     }
 
     // Restore any saved GPIO state
     if (!doSleep)
     {
+        if (wasEnabled)
+            NVIC_EnableIRQ(GPIOTE_IRQn);
+
         for (int i = 0; i < pins; i++)
         {
             name = pin[i].name;
@@ -189,5 +198,67 @@ int MicroBitIO::setSleep(bool doSleep)
         }
     }
    
+    return DEVICE_OK;
+}
+
+/**
+ * Perform functions related to deep sleep wake-up.
+ * Intended only to called from MicroBitPowerManager
+ */
+int MicroBitIO::manageWakeUp( wakeUpReason reason)
+{
+    switch (reason)
+    {
+        case wakeUpEnable: 
+            for (int i = 0; i < pins; i++)
+            {
+                if ( pin[i].getWakeOnActive())
+                {
+                    DMESG("MicroBitIO::manageWakeUp pin %d ON", i);
+                    if (!NVIC_GetEnableIRQ(GPIOTE_IRQn))
+                        NVIC_EnableIRQ(GPIOTE_IRQn);
+                    // Ensure the requested pin into digital input mode. 
+                    pin[i].getDigitalValue();
+                    // Enable an interrupt on the requested pin.
+                    pin[i].setDetect(pin[i].getPolarity() ? GPIO_PIN_CNF_SENSE_High : GPIO_PIN_CNF_SENSE_Low);
+                }
+            }
+            break;
+   
+        case wakeUpDisable:
+            for (int i = 0; i < pins; i++)
+            {
+                if ( pin[i].getWakeOnActive())
+                {
+                    DMESG("MicroBitIO::manageWakeUp pin %d OFF", i);
+                    // Diasble DETECT events 
+                    pin[i].setDetect(GPIO_PIN_CNF_SENSE_Disabled);
+                }
+            }
+            break;
+
+        case wakeUpCount:
+        {
+            int count = 0;
+
+            for (int i = 0; i < pins; i++)
+            {
+                if ( pin[i].getWakeOnActive())
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+        case wakeUpClear:
+            for (int i = 0; i < pins; i++)
+            {
+                if ( pin[i].getWakeOnActive())
+                {
+                    pin[i].wakeOnActive(false);
+                }
+            }
+            break;
+    }
     return DEVICE_OK;
 }

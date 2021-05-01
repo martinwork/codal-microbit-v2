@@ -137,6 +137,13 @@ typedef struct {
 #define MICROBIT_USB_INTERFACE_AWAITING_RESPONSE  0x01
 #define MICROBIT_USB_INTERFACE_VERSION_LOADED     0x02
 
+//
+// Minimum deep sleep time (microseconds)
+//
+#ifndef MICROBIT_POWER_MINIMUM_DEEP_SLEEP
+#define MICROBIT_POWER_MINIMUM_DEEP_SLEEP  50000
+#endif
+
 /**
  * Class definition for MicroBitPowerManager.
  */
@@ -150,7 +157,8 @@ class MicroBitPowerManager : public CodalComponent
         MicroBitUSBStatus       usbStatus;                          // Last known USB status
         MicroBitI2C             &i2cBus;                            // The I2C bus to use to communicate with USB interface chip
         MicroBitIO              &io;                                // Pins used by this device
-   
+        NRFLowLevelTimer        &sysTimer;                          // The system timer. 
+
         /**
          * Constructor.
          * Create a software abstraction of a power manager.
@@ -160,7 +168,7 @@ class MicroBitPowerManager : public CodalComponent
          * @param id the unique EventModel id of this component. Defaults to: MICROBIT_ID_POWER_MANAGER
          *
          */
-        MicroBitPowerManager(MicroBitI2C &i2c, MicroBitIO &ioPins, uint16_t id = MICROBIT_ID_POWER_MANAGER);
+        MicroBitPowerManager(MicroBitI2C &i2c, MicroBitIO &ioPins, NRFLowLevelTimer &systemTimer, uint16_t id = MICROBIT_ID_POWER_MANAGER);
 
         /**
          * Attempts to determine the power source currently in use on this micro:bit.
@@ -252,6 +260,27 @@ class MicroBitPowerManager : public CodalComponent
         virtual void idleCallback() override;
 
         /**
+          * Count all deep sleep wake up sources.
+          */
+        int countWakeUpSources();
+
+        /**
+         * Clear all deep sleep wake up sources, except Timer events.
+         */
+        void clearWakeUpSources();
+
+        /**
+         * Powers down the CPU and USB interface and instructs peripherals to enter an inoperative low power state. However, all
+         * program state is preserved. CPU will deepsleep for the given period of time, before returning to normal
+         * operation.
+         * 
+         * note: ALL peripherals will be shutdown in this period. If you wish to keep peripherals active,
+         * simply use uBit.sleep();
+         * @return DEVICE_OK if deep sleep occurred, or DEVICE_INVALID_STATE if no usable wake up source is available 
+         */
+        int deepSleepUntilWakeUp();
+
+        /**
          * Powers down the CPU and USB interface and instructs peripherals to enter an inoperative low power state. However, all
          * program state is preserved. CPU will deepsleep for the given period of time, before returning to normal
          * operation.
@@ -259,7 +288,7 @@ class MicroBitPowerManager : public CodalComponent
          * note: ALL peripherals will be shutdown in this period. If you wish to keep peripherals active,
          * simply use uBit.sleep();
          */
-        void deepSleep(uint32_t milliSeconds, NRFLowLevelTimer &sysTimer);
+        void deepSleep(uint32_t milliSeconds);
 
         /**
          * Powers down the CPU nd USB interface and instructs peripherals to enter an inoperative low power state. However, all
@@ -291,9 +320,15 @@ class MicroBitPowerManager : public CodalComponent
          * Prepares the micro:bit to enter or leave deep sleep mode.
          * This includes updating the status of the power LED, peripheral drivers and SENSE events on the combined IRQ line.
          * 
-         * @param doSleep Set to true to preapre for sleep, false to prepare to reawaken.
+         * @param doSleep Set to true to prepare for sleep, false to prepare to reawaken.
          */
         void setSleepMode(bool doSleep);
 
+        /**
+         * Prepare configured wake-up sources before entering deep sleep or after return from sleep.
+         * 
+         * @param enable Set to true to prepare for sleep, false to prepare to reawaken.
+         */
+        void enableWakeUpSources(bool enable);
 };
 #endif

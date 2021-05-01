@@ -1059,6 +1059,29 @@ bool MicroBitBLEManager::prepareForShutdown()
 
 
 /**
+ * Puts the component in (or out of) sleep (low power) mode.
+ */
+int MicroBitBLEManager::setSleep(bool doSleep)
+{
+    static bool wasEnabled;
+
+    if (doSleep)
+    {
+        wasEnabled = !nrf_sdh_is_suspended();
+        if (wasEnabled)
+            nrf_sdh_suspend();
+    }
+    else
+    {
+        if (wasEnabled)
+            nrf_sdh_resume();
+    }
+   
+    return DEVICE_OK;
+}
+
+
+/**
 * Ensure service changed indication pending for all peers
 */
 void MicroBitBLEManager::servicesChanged()
