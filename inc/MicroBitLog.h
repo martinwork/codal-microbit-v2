@@ -124,6 +124,7 @@ DEALINGS IN THE SOFTWARE.
 
 #define MICROBIT_LOG_EVT_LOG_FULL           1
 
+
 namespace codal
 {
     struct MicroBitLogMetaData
@@ -175,6 +176,14 @@ namespace codal
 
             return true;
         }
+    };
+
+
+    enum class DataFormat
+    {
+        HTMLHeader = 0,
+        HTML = 1,
+        CSV = 2
     };
 
     /**
@@ -321,6 +330,23 @@ namespace codal
          * @param s the string to inject.
          */
         int logString(ManagedString s);
+        
+        /**
+         * Get the length of the recorded data
+         * @param format the format of the data
+         * @return the length of the recorded data
+         */
+        uint32_t getDataLength(DataFormat format);
+        
+        /**
+         * Read the recorded data
+         * @param format the format of the data
+         * @param index   the index into the data
+         * @param data pointer to memory to store the data
+         * @param len length of the data to fetch
+         * @return DEVICE_OK on success.
+         */
+        int readData(DataFormat format, uint32_t index, void *data, uint32_t len);
 
     private:
 
@@ -343,7 +369,9 @@ namespace codal
         int _logData(ManagedString key, ManagedString value);
         int _logString(const char *s);
         int _logString(ManagedString s);
-
+        
+        uint32_t _getDataLength(DataFormat format);
+        int      _readData(DataFormat format, uint32_t index, void *data, int len);
 
         /**
          * Add the given heading to the list of headings in use. If the heading already exists,

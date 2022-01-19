@@ -976,6 +976,120 @@ bool MicroBitLog::isFull()
 }
 
 /**
+ * Get the length of the recorded data
+ * @param format the format of the data
+ * @return the length of the recorded data
+ */
+uint32_t MicroBitLog::getDataLength(DataFormat format)
+{
+    uint32_t r;
+    mutex.wait();
+    r = _getDataLength(format);
+    mutex.notify();
+    return r;
+}
+
+/**
+ * Read the recorded data
+ * @param format the format of the data
+ * @param index   the index into the data
+ * @param data pointer to memory to store the data
+ * @param len length of the data to fetch * @return DEVICE_OK on success.
+ * @return DEVICE_OK on success.
+ */
+int MicroBitLog::readData(DataFormat format, uint32_t index, void *data, uint32_t len)
+{
+    int r;
+    mutex.wait();
+    r = _readData(format, index, data, len);
+    mutex.notify();
+    return r;
+}
+
+/**
+ * Get the length of the recorded data file
+ * @param format the format of the data
+ * @return the length of the recorded data
+ */
+uint32_t MicroBitLog::_getDataLength(DataFormat format)
+{
+    init();
+    
+    uint32_t length = 0;
+    
+    DMESG( "%x %x %x %x", flash.getFlashStart(), (unsigned int) startAddress, (unsigned int) dataStart, (unsigned int) dataEnd);
+    
+    switch (format)
+    {
+        case DataFormat::HTMLHeader:
+            length = startAddress - flash.getFlashStart();
+            break;
+        case DataFormat::HTML:
+            length = dataEnd - flash.getFlashStart();
+            break;
+        case DataFormat::CSV:
+            length = dataEnd - dataStart;
+            break;
+    }
+    
+    return length;
+}
+
+/**
+ * Read the recorded data file
+ * @param format the format of the data
+ * @param index   the index into the data
+ * @param data pointer to memory to store the data
+ * @param len length of the data to fetch * @return DEVICE_OK on success.
+ * @return DEVICE_OK on success.
+ */
+int MicroBitLog::_readData(DataFormat format, uint32_t index, void *data, int len)
+{
+    init();
+    
+    if ( len <= 0)
+        return DEVICE_OK;
+    
+    uint32_t start = flash.getFlashStart();
+    uint32_t next  = dataEnd;
+
+    switch (format)
+    {
+        case DataFormat::HTMLHeader:
+            next  = startAddress;
+            break;
+        case DataFormat::HTML:
+            break;
+        case DataFormat::CSV:
+            start = dataStart;
+            break;
+        default:
+            return DEVICE_INVALID_PARAMETER;
+    }
+    
+    start += index;
+    
+    // Ensure that the operation is within the limits of the data
+    if (start + len > next)
+        return DEVICE_INVALID_PARAMETER;
+    
+    if ( start < startAddress)
+    {
+        memset( data, 0xFF, len);
+        if ( index < sizeof( header))
+        {
+            int max = sizeof( header) - index;
+            if ( max > len) max = len;
+            if ( max > 0)
+                memcpy( data, header + index, max);
+            return DEVICE_OK;
+        }
+    }
+    
+    return cache.read(start, data, len);
+}
+
+/**
  * Destructor.
  */
 MicroBitLog::~MicroBitLog()

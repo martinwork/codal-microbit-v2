@@ -58,7 +58,7 @@ class MicroBitBLEService
       */
     MicroBitBLEService();
 
-    ~MicroBitBLEService();
+    virtual ~MicroBitBLEService();
 
 
     protected:
