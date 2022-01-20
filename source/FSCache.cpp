@@ -83,6 +83,7 @@ int FSCache::read(uint32_t address, const void *data, int len)
 {
 	int bytesCopied = 0;
 
+    DMESG("FSCache::read");
 	// Ensure that the operation is within the limits of the device
 	if (address < flash.getFlashStart() || address + len >= flash.getFlashEnd())
 		return DEVICE_INVALID_PARAMETER;
@@ -120,6 +121,7 @@ int FSCache::write(uint32_t address, const void *data, int len)
 		return DEVICE_INVALID_PARAMETER;
 
 #ifdef CODAL_FS_CACHE_VALIDATE
+    DMESG("FSCache::write validate");
 	// Read operation may span multiple cache boundaries... so we iterate over blocks as necessary.
 	while (bytesCopied < len)
 	{
@@ -146,6 +148,8 @@ int FSCache::write(uint32_t address, const void *data, int len)
 	}
 
 #endif
+
+    DMESG("FSCache::write %x %x %d", (unsigned int) address, (unsigned int) data, len);
 
 	// Write operation is valid. Update cache and perform a write-through operation to FLASH.
 	bytesCopied = 0;
@@ -180,6 +184,7 @@ int FSCache::write(uint32_t address, const void *data, int len)
 */
 int FSCache::pin(uint32_t address)
 {
+    DMESG("FSCache::pin");
 	CacheEntry *c = cachePage(address);
 
 	if (c)
@@ -241,6 +246,7 @@ CacheEntry* FSCache::cachePage(uint32_t address)
 	if (lru->page == NULL)
 		lru->page = (uint8_t *) malloc(blockSize);
 
+    DMESG("FSCache::cachePage");
 	flash.read((uint32_t *)lru->page, address, blockSize / 4);
 
 	return lru;

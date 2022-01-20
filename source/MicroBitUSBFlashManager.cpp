@@ -23,6 +23,7 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #include "MicroBitUSBFlashManager.h"
+#include "CodalDmesg.h"
 
 static const KeyValueTableEntry usbFlashPropertyLengthData[] = {
     {MICROBIT_USB_FLASH_FILENAME_CMD, 12},
@@ -67,6 +68,7 @@ MicroBitUSBFlashConfig MicroBitUSBFlashManager::getConfiguration()
     {
         ManagedBuffer response;
 
+        DMESG("MicroBitUSBFlashManager::getConfiguration");
         // Load the configured filename
         response = transact(MICROBIT_USB_FLASH_FILENAME_CMD);
         if (response.length() > 5)
@@ -160,6 +162,7 @@ int MicroBitUSBFlashManager::setConfiguration(MicroBitUSBFlashConfig config, boo
     fvisible[0] = MICROBIT_USB_FLASH_VISIBILITY_CMD;
     fvisible[1] = config.visible ? 1 : 0;
 
+    DMESG("MicroBitUSBFlashManager::setConfiguration");
     // Write out each of the parameters in turn.
     transact(fname, 12);
     transact(fsize, 2);
@@ -189,6 +192,7 @@ MicroBitUSBFlashGeometry MicroBitUSBFlashManager::getGeometry()
     {
         ManagedBuffer response;
 
+        DMESG("MicroBitUSBFlashManager::getGeometry");
         // Load the block size data
         response = transact(MICROBIT_USB_FLASH_SECTOR_SIZE_CMD);
         if (response.length() > 0)
@@ -250,6 +254,7 @@ int MicroBitUSBFlashManager::remount()
 {
     ManagedBuffer cmd(1);
 
+        DMESG("MicroBitUSBFlashManager::remount");
     cmd[0] = MICROBIT_USB_FLASH_REMOUNT_CMD;
     transact(cmd, 1);
 
@@ -265,6 +270,7 @@ int MicroBitUSBFlashManager::eraseConfig()
 {
     ManagedBuffer cmd(1);
 
+        DMESG("MicroBitUSBFlashManager::eraseConfig");
     cmd[0] = MICROBIT_USB_FLASH_ERASE_CONFIG_CMD;
     transact(cmd, 1);
 
@@ -285,6 +291,7 @@ MicroBitUSBFlashManager::read(uint32_t address, uint32_t length)
     ManagedBuffer request(8);
     ManagedBuffer response;
 
+        DMESG("MicroBitUSBFlashManager::read");
     // Convert length parameter from 32-bit count to a byte count.
     length = length * sizeof(uint32_t);
 
@@ -361,6 +368,7 @@ int MicroBitUSBFlashManager::write(uint32_t address, uint32_t *data, uint32_t le
         memcpy(ptr, data + (bytesWritten/4), segmentLength);
 
         request.truncate(segmentLength + 8);
+        DMESG("MicroBitUSBFlashManager::write");
         response = transact(request, 9);
 
         if (response.length() == 0)
@@ -425,6 +433,8 @@ int MicroBitUSBFlashManager::erase(uint32_t address, uint32_t length)
     // Determine if we need to undertake a "partial erase" of any blocks
     if (eraseStart != address || length != (eraseEnd - eraseStart) + geometry.blockSize)
     {
+        DMESG("MicroBitUSBFlashManager::erase partial");
+
         // We need to take the slow path, and save/restore some data...
         // We also need to ensure our data is on a 32 bit boundary.
         int restoreLength1 = address - eraseStart;
@@ -445,6 +455,7 @@ int MicroBitUSBFlashManager::erase(uint32_t address, uint32_t length)
             *p++ = htonl(page | (MICROBIT_USB_FLASH_ERASE_CMD << 24));
             *p++ = htonl(page);
 
+        DMESG("MicroBitUSBFlashManager::erase single");
             response = transact(request, 1);
             if (response.length() == 0)
             {
@@ -459,6 +470,7 @@ int MicroBitUSBFlashManager::erase(uint32_t address, uint32_t length)
         *p++ = htonl(eraseStart | (MICROBIT_USB_FLASH_ERASE_CMD << 24));
         *p++ = htonl(eraseEnd);
 
+        DMESG("MicroBitUSBFlashManager::erase else");
         response = transact(request, 1);
         if (response.length() == 0)
         {
@@ -571,6 +583,8 @@ ManagedBuffer MicroBitUSBFlashManager::_transact(ManagedBuffer request, int resp
     int tx_attempts = 0;
     int rx_attempts = 0;
 
+    DMESG("_transact(%d,%d,%d)", request[0], request.length(), responseLength);
+
     ManagedBuffer b(max(responseLength, 3));
 
     while(tx_attempts < MICROBIT_USB_FLASH_MAX_TX_RETRIES)
@@ -610,6 +624,7 @@ ManagedBuffer MicroBitUSBFlashManager::_transact(ManagedBuffer request, int resp
                         // We have a valid response. Consume it, and we're done.
                         power.awaitingPacket(false);
                         b.truncate(responseLength);
+                        DMESG("TRANSACT: done %d %d", tx_attempts, rx_attempts);
                         return b;
                     }
                     else
@@ -620,9 +635,15 @@ ManagedBuffer MicroBitUSBFlashManager::_transact(ManagedBuffer request, int resp
                         bool busy = (status & MICROBIT_USB_FLASH_BUSY_FLAG_SUPPORTED) ? b[0] == 0x20 && b[1] == 0x39 : b[0] == 0x00 || (b[0] == 0x20 && (b[1] == request[0] || b[1] == 0x00));
 
                         if (busy)
+                        {
+                            DMESG("TRANSACT: busy %d %d %x %x", tx_attempts, rx_attempts, (unsigned int) b[0], (unsigned int) b[1]);
                             rx_attempts = 0;
+                        }
                         else
+                        {
+                            DMESG("TRANSACT: fail %d %d %x %x", tx_attempts, rx_attempts, (unsigned int) b[0], (unsigned int) b[1]);
                             break;
+                        }
                     }
                 }
                 else

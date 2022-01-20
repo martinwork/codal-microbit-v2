@@ -82,6 +82,8 @@ void MicroBitLog::init()
 
     if (_isPresent())
     {
+    DMESG("MicroBitLog::init");
+
         // We have a valid file system.
         JournalEntry j;
         journalPages = (dataStart - journalStart) / flash.getPageSize();
@@ -946,6 +948,8 @@ bool MicroBitLog::_isPresent()
 
     // Calculate where our metadata should start, and load the data.
     startAddress = sizeof(header);
+
+    DMESG("MicroBitLog::_isPresent");
 
     // Read the metadata area from flash memory.
     // n.b. we do this using a direct read (rather than via the cache) to avoid preheating the cache with potentially useless data.
