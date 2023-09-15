@@ -94,7 +94,7 @@ PacketBuffer::PacketBuffer(uint8_t *data, int length, int rssi)
 PacketBuffer::PacketBuffer(const PacketBuffer &buffer)
 {
     ptr = buffer.ptr;
-    ptr->incr();
+    ptr->incr( this, "iPktPkt");
 }
 
 /**
@@ -112,7 +112,7 @@ void PacketBuffer::init(uint8_t *data, int length, int rssi)
         length = 0;
 
     ptr = (PacketData *) malloc(sizeof(PacketData) + length);
-    ptr->init();
+    ptr->init(this);
 
     ptr->length = length;
     ptr->rssi = rssi;
@@ -129,7 +129,7 @@ void PacketBuffer::init(uint8_t *data, int length, int rssi)
   */
 PacketBuffer::~PacketBuffer()
 {
-    ptr->decr();
+    ptr->decr( this, "dPkt~");
 }
 
 /**
@@ -157,9 +157,9 @@ PacketBuffer& PacketBuffer::operator = (const PacketBuffer &p)
     if(ptr == p.ptr)
         return *this;
 
-    ptr->decr();
+    ptr->decr( this, "dPkt=");
     ptr = p.ptr;
-    ptr->incr();
+    ptr->incr( this, "iPkt=");
 
     return *this;
 }
