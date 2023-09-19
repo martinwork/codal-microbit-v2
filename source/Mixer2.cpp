@@ -235,6 +235,8 @@ ManagedBuffer Mixer2::pull()
     uint8_t *w = &output[0];
     float *r = mix;
 
+    RefCounted_op( NULL, &output, "output Mixer2::pull");
+
     int len = output.length() / bytesPerSampleOut;
     float scale = volume * outputRange / CONFIG_MIXER_INTERNAL_RANGE;
     int offset = (outputFormat == DATASTREAM_FORMAT_16BIT_UNSIGNED || outputFormat == DATASTREAM_FORMAT_8BIT_UNSIGNED) ? outputRange/2 : 0;
