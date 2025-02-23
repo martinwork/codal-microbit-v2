@@ -51,6 +51,8 @@ MicroBitAudio::MicroBitAudio(NRF52Pin &pin, NRF52Pin &speaker, NRF52ADC &adc, NR
     soundExpressions(synth),
     virtualOutputPin(mixer)
 {
+    DMESG("MicroBitAudio::MicroBitAudio");
+
     // If we are the first instance created, schedule it for on demand activation
     if (MicroBitAudio::instance == NULL)
         MicroBitAudio::instance = this;
@@ -106,6 +108,7 @@ void MicroBitAudio::periodicCallback()
 }
 
 void MicroBitAudio::activateMic(){
+    DMESG("MicroBitAudio::activateMic");
     runmic.setDigitalValue(1);
     runmic.setHighDrive(true);
     adc.activateChannel(mic);
@@ -114,6 +117,7 @@ void MicroBitAudio::activateMic(){
 }
 
 void MicroBitAudio::deactivateMic(){
+    DMESG("MicroBitAudio::deactivateMic");
     this->micEnabled = false;
     runmic.setDigitalValue(0);
     runmic.setHighDrive(false);
