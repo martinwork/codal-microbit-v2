@@ -16,6 +16,8 @@ jobs:
         with:
           repository: 'microbit-foundation/micropython-microbit-v2'
           submodules: 'true'
+          # FIXME: Temporarily check out the audio-recording branch for testing
+          ref: 'audio-recording'
       - name: Setup arm-none-eabi-gcc v10.3
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
