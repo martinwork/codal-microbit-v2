@@ -98,18 +98,19 @@ void MicroBitAudio::periodicCallback()
 {
     if (mic->isEnabled() && !micEnabled)
     {
-        //DMESG("MicroBitAudio::periodicCallback: activateMic()...");
+        DMESG("MicroBitAudio::periodicCallback: activateMic()...");
         activateMic();
     }
 
     if (!mic->isEnabled() && micEnabled)
     {
-        //DMESG("MicroBitAudio::periodicCallback: deactivateMic()...");
+        DMESG("MicroBitAudio::periodicCallback: deactivateMic()...");
         deactivateMic();
     }
 }
 
 void MicroBitAudio::activateMic(){
+    DMESG("activateMic");
     runmic.setDigitalValue(1);
     runmic.setHighDrive(true);
     adc.activateChannel(mic);
@@ -118,6 +119,7 @@ void MicroBitAudio::activateMic(){
 }
 
 void MicroBitAudio::deactivateMic(){
+    DMESG("deactivateMic");
     this->micEnabled = false;
     runmic.setDigitalValue(0);
     runmic.setHighDrive(false);
