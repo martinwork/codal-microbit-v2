@@ -65,7 +65,7 @@
         {
             "name":"codal-nrf52",
             "url":"https://github.com/lancaster-university/codal-nrf52",
-            "branch":"master",
+            "branch":"mw-test-python-v2",
             "type":"git"
         },
         {
