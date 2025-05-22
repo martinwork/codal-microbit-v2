@@ -111,6 +111,7 @@ void MicroBitAudio::periodicCallback()
 }
 
 void MicroBitAudio::activateMic(){
+    DMESG("MicroBitAudio::activateMic()");
     runmic.setDigitalValue(1);
     runmic.setHighDrive(true);
     adc.activateChannel(mic);
@@ -119,6 +120,7 @@ void MicroBitAudio::activateMic(){
 }
 
 void MicroBitAudio::deactivateMic(){
+    DMESG("MicroBitAudio::deactivateMic()");
     this->micEnabled = false;
     runmic.setDigitalValue(0);
     runmic.setHighDrive(false);
